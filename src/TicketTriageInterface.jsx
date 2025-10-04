@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { costOfDelayService } from './services/costOfDelayService';
+import { salaryService } from './services/salaryService';
 import CostOfDelay from './components/CostOfDelay';
+import DataVisualization from './components/DataVisualization';
 
 // Professional, single-file React component using Tailwind CSS for styling.
 // Default export is the component so it can be previewed in the canvas.
@@ -16,11 +18,27 @@ export default function TicketTriageInterface({ onBack }) {
     deadline: '',
     severity: 'Medium',
     description: '',
+    project: '',
   });
 
   const [result, setResult] = useState(null);
   const [showCostDashboard, setShowCostDashboard] = useState(false);
   const [showDataViz, setShowDataViz] = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const [issuedTickets, setIssuedTickets] = useState([]);
+  const [projects] = useState(['Website Redesign', 'Mobile App', 'API Development', 'Database Migration', 'Security Audit']);
+
+  useEffect(() => {
+    // Load employees when component mounts
+    setEmployees(salaryService.getAllEmployees());
+    // Load issued tickets
+    loadIssuedTickets();
+  }, []);
+
+  const loadIssuedTickets = () => {
+    const allTickets = costOfDelayService.getAllTickets();
+    setIssuedTickets(allTickets);
+  };
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -33,7 +51,7 @@ export default function TicketTriageInterface({ onBack }) {
     if (!form.issuedto) reasons.push('Missing issued to field');
     if (!form.issuedtoEmail) reasons.push('Missing issued to Email.');
     if (!form.issuerEmail) reasons.push('Missing issuer contact (email).');
-    if (!form.description || form.description.trim().length < 20) reasons.push('Description too short — please provide reproduction steps and expected behaviour.');
+    if (!form.description || form.description.trim().length < 15) reasons.push('Description too short — please provide reproduction steps and expected behaviour.');
     if (!form.deadline) reasons.push('Missing deadline.');
     return reasons;
   }
@@ -129,46 +147,41 @@ export default function TicketTriageInterface({ onBack }) {
     if (classification.action === 'Forward' && form.deadline) {
       const ticketId = costOfDelayService.addTicket(form);
       console.log(`Ticket ${ticketId} added to cost tracking system`);
+      loadIssuedTickets(); // Reload tickets list
     }
   }
 
-  function downloadJSON() {
-    const payload = { ...form, classification: result };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ticket-${(form.issuerName || 'unknown').replace(/\s+/g, '-')}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+  const deleteTicket = (ticketId) => {
+    if (window.confirm('Are you sure you want to delete this ticket? This action cannot be undone.')) {
+      costOfDelayService.removeTicket(ticketId);
+      loadIssuedTickets();
+    }
+  };
+
+  const getTicketStatus = (ticket) => {
+    if (ticket.status === 'completed') return 'Completed';
+    if (!ticket.deadline) return 'No Deadline';
+    
+    const today = new Date();
+    const deadline = new Date(ticket.deadline);
+    return today <= deadline ? 'On Time' : 'Delayed';
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'On Time': return 'bg-green-100 text-green-800';
+      case 'Delayed': return 'bg-red-100 text-red-800';
+      case 'Completed': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
 
   if (showCostDashboard) {
     return <CostOfDelay onBack={() => setShowCostDashboard(false)} />;
   }
 
   if (showDataViz) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
-        <div className="max-w-2xl w-full bg-white shadow-2xl rounded-2xl p-8">
-          <div className="text-center">
-            <div className="w-24 h-24 bg-gradient-to-r from-red-100 via-orange-100 to-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-semibold text-slate-800 mb-4">Data Visualization</h2>
-            <p className="text-slate-600 mb-8">Advanced analytics and visualization features are coming soon.</p>
-            <button
-              onClick={() => setShowDataViz(false)}
-              className="px-6 py-3 bg-gradient-to-r from-red-600 via-orange-500 to-yellow-400 text-white rounded-lg hover:from-red-700 hover:to-yellow-500 transition-colors"
-            >
-              Back to Triage
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    return <DataVisualization onBack={() => setShowDataViz(false)} />;
   }
 
   return (
@@ -256,14 +269,18 @@ export default function TicketTriageInterface({ onBack }) {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Issued to Name</label>
-                  <input 
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Issued to</label>
+                  <select 
                     name="issuedto" 
                     value={form.issuedto} 
                     onChange={handleChange} 
-                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all" 
-                    placeholder="Full name" 
-                  />
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                  >
+                    <option value="">Select an employee...</option>
+                    {employees.map(employee => (
+                      <option key={employee} value={employee}>{employee}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -290,6 +307,21 @@ export default function TicketTriageInterface({ onBack }) {
               </div>
 
               <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Project</label>
+                  <select 
+                    name="project" 
+                    value={form.project} 
+                    onChange={handleChange} 
+                    className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                  >
+                    <option value="">Select a project...</option>
+                    {projects.map(project => (
+                      <option key={project} value={project}>{project}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Ticket Type</label>
                   <select 
@@ -364,7 +396,8 @@ export default function TicketTriageInterface({ onBack }) {
                       ticketType: 'Bug', 
                       deadline: '', 
                       severity: 'Medium', 
-                      description: '' 
+                      description: '',
+                      project: ''
                     }); 
                     setResult(null); 
                   }} 
@@ -483,9 +516,64 @@ export default function TicketTriageInterface({ onBack }) {
                 </div>
               )}
             </section>
+
+            {/* Issued Tickets List */}
+            {issuedTickets.length > 0 && (
+              <section className="mt-12">
+                <h2 className="text-2xl font-bold text-black mb-6">Issued Tickets</h2>
+                <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200/50 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full table-auto">
+                      <thead>
+                        <tr className="bg-slate-50/80">
+                          <th className="px-6 py-4 text-left text-sm font-medium text-black">Ticket ID</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-black">Project</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-black">Assigned To</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-black">Type</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-black">Status</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-black">Deadline</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-black">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200/50">
+                        {issuedTickets.map((ticket, index) => {
+                          const status = getTicketStatus(ticket);
+                          return (
+                            <tr key={ticket.id || index} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-6 py-4 text-sm text-black font-medium">{ticket.id}</td>
+                              <td className="px-6 py-4 text-sm text-black">{ticket.project || 'Unassigned'}</td>
+                              <td className="px-6 py-4 text-sm text-black">{ticket.issuedto}</td>
+                              <td className="px-6 py-4 text-sm text-black">{ticket.ticketType}</td>
+                              <td className="px-6 py-4 text-sm">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
+                                  {status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-sm text-black">
+                                {ticket.deadline ? new Date(ticket.deadline).toLocaleDateString() : 'No deadline'}
+                              </td>
+                              <td className="px-6 py-4 text-sm">
+                                <button
+                                  onClick={() => deleteTicket(ticket.id)}
+                                  className="px-3 py-1 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors text-xs font-medium"
+                                  aria-label={`Delete ticket ${ticket.id}`}
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
 }
+

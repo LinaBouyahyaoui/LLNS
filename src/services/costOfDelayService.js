@@ -124,6 +124,12 @@ export class CostOfDelayService {
     }
   }
 
+  // Remove ticket from tracking
+  removeTicket(ticketId) {
+    this.tickets.delete(ticketId);
+    this.delayHistory.delete(ticketId);
+  }
+
   // Generate email content for manager
   generateManagerEmail(managerData) {
     const { managerName, managerEmail, totalCost, tickets } = managerData;
