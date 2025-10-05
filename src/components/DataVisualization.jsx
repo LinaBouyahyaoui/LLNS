@@ -130,17 +130,17 @@ export default function DataVisualization({ onBack }) {
       total: stats.total
     }));
 
-    // Top performers (highest number of completed tasks)
+    // Top performer (highest number of completed tasks with tasks > 0)
     const topPerformersData = performers
-      .filter(p => p.total > 0) // Only consider employees with assigned tasks
+      .filter(p => p.completed > 0) // Only show employees with completed tasks > 0
       .sort((a, b) => b.completed - a.completed)
-      .slice(0, 3);
+      .slice(0, 1); // Only show the top one
 
-    // Needs improvement (most delayed tickets, ignore employees with zero assigned tasks)
+    // Needs improvement (most delayed tickets with delays > 0)
     const lowestPerformersData = performers
-      .filter(p => p.total > 0) // Only consider employees with assigned tasks
+      .filter(p => p.delays > 0) // Only show employees with delays > 0
       .sort((a, b) => b.delays - a.delays)
-      .slice(0, 3);
+      .slice(0, 1); // Only show the one with most delays
 
     setTopPerformers(topPerformersData);
     setLowestPerformers(lowestPerformersData);
