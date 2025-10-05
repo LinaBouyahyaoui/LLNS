@@ -121,27 +121,25 @@ export default function DataVisualization({ onBack }) {
       }
     });
 
-    // Calculate averages and sort performers
+    // Calculate performer stats
     const performers = Object.entries(employeeStats).map(([name, stats]) => ({
       name,
       completionRate: stats.total > 0 ? (stats.completed / stats.total) * 100 : 0,
-      avgResolutionTime: stats.completed > 0 ? stats.avgResolutionTime / stats.completed : 0,
+      completed: stats.completed,
       delays: stats.delays,
       total: stats.total
     }));
 
-    // Top performers (high completion rate, low resolution time, few delays)
+    // Top performers (highest number of completed tasks)
     const topPerformersData = performers
-      .filter(p => p.total >= 2) // Only consider employees with at least 2 tickets
-      .sort((a, b) => (b.completionRate + (100 - a.avgResolutionTime) + (100 - a.delays * 10)) - 
-                     (a.completionRate + (100 - b.avgResolutionTime) + (100 - b.delays * 10)))
+      .filter(p => p.total > 0) // Only consider employees with assigned tasks
+      .sort((a, b) => b.completed - a.completed)
       .slice(0, 3);
 
-    // Lowest performers
+    // Needs improvement (most delayed tickets, ignore employees with zero assigned tasks)
     const lowestPerformersData = performers
-      .filter(p => p.total >= 2)
-      .sort((a, b) => (a.completionRate + a.avgResolutionTime + a.delays * 10) - 
-                     (b.completionRate + b.avgResolutionTime + b.delays * 10))
+      .filter(p => p.total > 0) // Only consider employees with assigned tasks
+      .sort((a, b) => b.delays - a.delays)
       .slice(0, 3);
 
     setTopPerformers(topPerformersData);
@@ -317,8 +315,8 @@ export default function DataVisualization({ onBack }) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-green-600">{performer.completionRate.toFixed(1)}%</p>
-                        <p className="text-xs text-slate-500">completion rate</p>
+                        <p className="font-semibold text-green-600">{performer.completed}</p>
+                        <p className="text-xs text-slate-500">tasks completed</p>
                       </div>
                     </div>
                   ))}
@@ -341,8 +339,8 @@ export default function DataVisualization({ onBack }) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-red-600">{performer.completionRate.toFixed(1)}%</p>
-                        <p className="text-xs text-slate-500">completion rate</p>
+                        <p className="font-semibold text-red-600">{performer.delays}</p>
+                        <p className="text-xs text-slate-500">delayed tickets</p>
                       </div>
                     </div>
                   ))}
@@ -352,7 +350,7 @@ export default function DataVisualization({ onBack }) {
           </div>
 
           {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-slate-200/50 text-center">
               <div className="w-12 h-12 bg-gradient-to-r from-red-100 via-orange-100 to-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -389,31 +387,6 @@ export default function DataVisualization({ onBack }) {
               </p>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-slate-200/50 text-center">
-              <div className="w-12 h-12 bg-gradient-to-r from-red-100 via-orange-100 to-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <h4 className="text-lg font-semibold text-black">Avg. Resolution</h4>
-              <p className="text-2xl font-bold bg-gradient-to-r from-red-600 via-orange-500 to-yellow-400 bg-clip-text text-transparent mt-2">
-                {(() => {
-                  const completedTickets = ticketData.filter(t => 
-                    (selectedProject === 'All Projects' || t.project === selectedProject) && 
-                    t.status === 'completed' && t.completedAt
-                  );
-                  if (completedTickets.length === 0) return '0';
-                  
-                  const avgTime = completedTickets.reduce((sum, ticket) => {
-                    const created = new Date(ticket.createdAt);
-                    const completed = new Date(ticket.completedAt);
-                    return sum + (completed - created) / (1000 * 60 * 60 * 24);
-                  }, 0) / completedTickets.length;
-                  
-                  return `${avgTime.toFixed(1)}d`;
-                })()}
-              </p>
-            </div>
           </div>
         </div>
       </div>
