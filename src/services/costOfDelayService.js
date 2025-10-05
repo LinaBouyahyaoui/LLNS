@@ -121,6 +121,7 @@ export class CostOfDelayService {
     if (ticket) {
       ticket.status = 'completed';
       ticket.completedAt = new Date();
+      console.log(`Ticket ${ticketId} marked as completed at ${ticket.completedAt}`);
     }
   }
 
@@ -128,6 +129,7 @@ export class CostOfDelayService {
   removeTicket(ticketId) {
     this.tickets.delete(ticketId);
     this.delayHistory.delete(ticketId);
+    
   }
 
   // Generate email content for manager
